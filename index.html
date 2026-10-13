@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Management System</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: Arial, sans-serif;
+  background: #f1f5f9; color: #172033;
+}
+header {
+  background: #17365d; color: white;
+  padding: 22px 16px; text-align: center;
+}
+header h2 { margin: 0 0 6px; }
+main { max-width: 650px; margin: auto; padding: 16px; }
+.panel {
+  background: white; padding: 16px; margin-bottom: 16px;
+  border-radius: 12px; box-shadow: 0 2px 8px #0000000c;
+}
+input, select, button {
+  width: 100%; padding: 12px; margin: 6px 0;
+  border-radius: 7px; font-size: 16px;
+}
+input, select { border: 1px solid #cbd5e1; background: white; }
+button {
+  border: none; background: #1765b1; color: white;
+  font-weight: bold; cursor: pointer;
+}
+button:active { opacity: .8; }
+button.danger { background: #b42318; }
+button.secondary { background: #475569; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: #e7f0ff; padding: 14px; border-radius: 9px; }
+.stat strong { display: block; font-size: 25px; margin-top: 5px; }
+.student {
+  border: 1px solid #e2e8f0; padding: 12px;
+  border-radius: 9px; margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.student p { margin: 7px 0; }
+.actions { display: flex; gap: 8px; }
+.actions button { flex: 1; font-size: 14px; }
+small { color: #64748b; }
+</style>
+</head>
+<body>
+<header>
+  <h2>🎓 Student Manager</h2>
+  <div>Student Management System</div>
+</header>
+
+<main>
+  <section class="panel">
+    <h3>Dashboard</h3>
+    <div class="stats">
+      <div class="stat">Total students
+        <strong id="total">0</strong>
+      </div>
+      <div class="stat">Classes
+        <strong id="classes">0</strong>
+      </div>
+    </div>
+    <p id="classSummary"><small>No student records yet.</small></p>
+  </section>
+
+  <section class="panel">
+    <h3 id="formTitle">Register Student</h3>
+    <form id="studentForm">
+      <label for="studentId">Registration number</label>
+      <input id="studentId" placeholder="e.g. 226-103011-12223"
+             required maxlength="30">
+
+      <label for="firstName">Surname </label>
+      <input id="firstName" placeholder="Enter first name"
+             required maxlength="15"> 
+      
+      <label for="secondName">Given Name</label>
+      <input id="secondName" placeholder="Enter second name"
+      		require maxlength="15">
+
+      <label for="LectureName">Course unity</label>
+      <select id="LectureName" required>
+        <option value="">Select Course Unity</option>
+        <option>Intoduction to Computer applications</option>
+        <option>Intoduction to Islam</option>
+        <option>Programming and problem solving</option>
+        <option>Intoduction to Computing</option>
+        <option>Intoduction to Information System</option>
+        <option>Intoduction to Mathematics</option>
+        <option>Intoduction to Language and Communication skills</option>
+        <option>Other</option>
+      </select>
+
+      <label for="age">Age</label>
+      <input id="age" type="number" min="19" max="50"
+             placeholder="Enter age" required>
+
+      <label for="gender">Gender</label>
+      <select id="gender" required>
+        <option value="">Select gender</option>
+        <option>Male</option>
+        <option>Female</option>
+         </select>
+		
+        <label for="Status">Status</label>
+        <select id="status" required>
+        <option value="">Select status</option>
+        <option>Married</option>
+        <option>Single</option>
+        <option>Single mother</option>
+        <option>Single father</option>
+        <option>Divorced</option>
+        <option>Aborted</option>
+        </select>
+        
+      <button type="submit" id="saveButton">Save Student</button>
+      <button type="button" class="secondary"
+              id="cancelButton" hidden>Cancel Edit</button>
+    </form>
+    <p id="message" role="status"></p>
+  </section>
+
+  <section class="panel">
+    <h3>Student Records</h3>
+    <input id="search" placeholder="Search name or student ID...">
+    <div id="studentList"></div>
+  </section>
+
+  <section class="panel">
+    <h3>Backup</h3>
+    <p><small>Download a copy of your student records as a JSON file.</small></p>
+    <button type="button" id="exportButton">Export Records</button>
+    <label for="importFile">Restore from a JSON backup</label>
+    <input type="file" id="importFile" accept=".json,application/json">
+    <small>Restoring replaces the records currently stored on this device.</small>
+  </section>
+</main>
+
+<script>
+const STORAGE_KEY = "studentManagerRecordsV1";
+
+const $ = id => document.getElementById(id);
+const form = $("studentForm");
+let students = [];
+let editingId = null;
+
+function loadStudents() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const data = saved ? JSON.parse(saved) : [];
+    students = Array.isArray(data) ? data : [];
+  } catch {
+    students = [];
+    alert("Saved data could not be read. Check your backup before continuing.");
+  }
+}
+
+function saveStudents() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+    return true;
+  } catch {
+    alert("Could not save data. Export a backup and check device storage.");
+    return false;
+  }
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  })[ch]);
+}
+
+function resetForm() {
+  form.reset();
+  editingId = null;
+  $("formTitle").textContent = "Register Student";
+  $("saveButton").textContent = "Save Student";
+  $("studentId").readOnly = false;
+  $("cancelButton").hidden = true;
+}
+
+form.addEventListener("submit", event => {
+  event.preventDefault();
+
+  const studentId = $("studentId").value.trim();
+  const fullName = $("fullName").value.trim();
+  const className = $("className").value;
+  const age = Number($("age").value);
+  const gender = $("gender").value;
+
+  if (!studentId || !fullName || !className ||
+      !gender || !Number.isInteger(age) || age < 3 || age > 100) {
+    $("message").textContent = "Please enter valid student details.";
+    return;
+  }
+
+  const duplicate = students.some(s =>
+    s.studentId.toLowerCase() === studentId.toLowerCase() &&
+    s.studentId !== editingId
+  );
+
+  if (duplicate) {
+    $("message").textContent = "That registration number already exists.";
+    return;
+  }
+
+  const previous = students;
+  if (editingId) {
+    students = students.map(s => s.studentId === editingId
+      ? { ...s, fullName, className, age, gender }
+      : s
+    );
+  } else {
+    students = [...students, {
+      studentId, fullName, className, age, gender,
+      createdAt: new Date().toISOString()
+    }];
+  }
+
+  if (!saveStudents()) {
+    students = previous;
+    return;
+  }
+
+  $("message").textContent = editingId
+    ? "Student record updated successfully."
+    : "Student registered successfully.";
+
+  resetForm();
+  render();
+});
+
+function editStudent(id) {
+  const s = students.find(item => item.studentId === id);
+  if (!s) return;
+
+  editingId = id;
+  $("studentId").value = s.studentId;
+  $("fullName").value = s.fullName;
+  $("className").value = s.className;
+  $("age").value = s.age;
+  $("gender").value = s.gender;
+  $("studentId").readOnly = true;
+  $("formTitle").textContent = "Edit Student";
+  $("saveButton").textContent = "Update Student";
+  $("cancelButton").hidden = false;
+  $("message").textContent = "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function deleteStudent(id) {
+  const s = students.find(item => item.studentId === id);
+  if (!s || !confirm("Delete the record for " + s.fullName + "?")) return;
+
+  const previous = students;
+  students = students.filter(item => item.studentId !== id);
+
+  if (!saveStudents()) {
+    students = previous;
+    return;
+  }
+
+  if (editingId === id) resetForm();
+  $("message").textContent = "Student record deleted.";
+  render();
+}
+
+function render() {
+  $("total").textContent = students.length;
+
+  const counts = {};
+  students.forEach(s => {
+    counts[s.className] = (counts[s.className] || 0) + 1;
+  });
+
+  $("classes").textContent = Object.keys(counts).length;
+  $("classSummary").innerHTML = Object.keys(counts).length
+    ? Object.entries(counts).map(([name, count]) =>
+        escapeHTML(name) + ": " + count
+      ).join(" · ")
+    : "<small>No student records yet.</small>";
+
+  const query = $("search").value.trim().toLowerCase();
+  const filtered = students.filter(s =>
+    s.studentId.toLowerCase().includes(query) ||
+    s.fullName.toLowerCase().includes(query) ||
+    s.className.toLowerCase().includes(query)
+  );
+
+  $("studentList").innerHTML = filtered.length
+    ? filtered.map(s => `
+      <article class="student">
+        <strong>${escapeHTML(s.fullName)}</strong>
+        <p>ID: ${escapeHTML(s.studentId)}</p>
+        <p>Class: ${escapeHTML(s.className)}</p>
+        <p>Age: ${escapeHTML(s.age)} · Gender: ${escapeHTML(s.gender)}</p>
+        <div class="actions">
+          <button type="button" data-edit="${escapeHTML(s.studentId)}">
+            Edit
+          </button>
+          <button type="button" class="danger"
+                  data-delete="${escapeHTML(s.studentId)}">
+            Delete
+          </button>
+        </div>
+      </article>
+    `).join("")
+    : "<p>No matching student records.</p>";
+}
+
+$("studentList").addEventListener("click", event => {
+  const edit = event.target.closest("[data-edit]");
+  const del = event.target.closest("[data-delete]");
+  if (edit) editStudent(edit.dataset.edit);
+  if (del) deleteStudent(del.dataset.delete);
+});
+
+$("search").addEventListener("input", render);
+$("cancelButton").addEventListener("click", resetForm);
+
+$("exportButton").addEventListener("click", () => {
+  const file = new Blob([JSON.stringify(students, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "student-records-backup.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+$("importFile").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data)) throw new Error("Invalid format");
+
+    const ids = new Set();
+    for (const s of data) {
+      if (!s || typeof s.studentId !== "string" ||
+          !s.studentId.trim() || typeof s.fullName !== "string" ||
+          !s.fullName.trim() || typeof s.className !== "string" ||
+          !Number.isInteger(Number(s.age)) ||
+          Number(s.age) < 3 || Number(s.age) > 100 ||
+          typeof s.gender !== "string" ||
+          !["Male", "Female", "Prefer not to say"].includes(s.gender)) {
+        throw new Error("Invalid student record");
+      }
+      const key = s.studentId.toLowerCase();
+      if (ids.has(key)) throw new Error("Duplicate student ID");
+      ids.add(key);
+    }
+
+    if (!confirm("Replace all current records with " + data.length +
+                 " imported records? Export a backup first if needed.")) return;
+
+    const previous = students;
+    students = data;
+    if (!saveStudents()) students = previous;
+    else {
+      resetForm();
+      $("message").textContent = "Backup restored successfully.";
+      render();
+    }
+  } catch {
+    alert("Import failed. Please choose a valid student-records backup.");
+  } finally {
+    event.target.value = "";
+  }
+});
+
+loadStudents();
+render();
+</script>
+</body>
+</html>
